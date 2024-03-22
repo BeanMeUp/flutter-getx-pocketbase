@@ -33,9 +33,7 @@ class AuthController extends GetxController {
           (url) async {
         await launchUrl(url, webOnlyWindowName: '_blank');
       });
-
       await _secureStorageService.saveToken(authData.token);
-
       isUserAuthenticated.value = true;
       Get.offAllNamed('/dashboard');
     } catch (e) {
