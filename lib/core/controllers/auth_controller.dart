@@ -1,50 +1,34 @@
 import 'package:get/get.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/pocketbase/pocketbase.dart';
-import '../services/secure_storage.dart';
 
 class AuthController extends GetxController {
-  final SecureStorageService _secureStorageService = SecureStorageService();
-  RxBool isUserAuthenticated = false.obs;
-
-  void restoreSession() async {
-    String? token = await _secureStorageService.getToken();
-    if (token != null && token.isNotEmpty) {
-      isUserAuthenticated.value = true;
-    } else {
-      isUserAuthenticated.value = false;
-    }
-  }
+  final PocketBase pb = PocketBaseSingleton().client;
 
   Future<void> login(String email, String password) async {
-    try {
-      final user =
-          await pb.collection('users').authWithPassword(email, password);
-      await _secureStorageService.saveToken(user.token);
-      isUserAuthenticated.value = true;
-    } catch (e) {
-      isUserAuthenticated.value = false;
+    final user = await pb.collection('users').authWithPassword(email, password);
+    if (user.token.isNotEmpty && user.record != null) {
+      Get.offAllNamed('/dashboard');
     }
   }
 
   Future<void> loginProvider(String providerName) async {
-    try {
-      final authData = await pb.collection('users').authWithOAuth2(providerName,
-          (url) async {
-        await launchUrl(url, webOnlyWindowName: '_blank');
-      });
-      await _secureStorageService.saveToken(authData.token);
-      isUserAuthenticated.value = true;
+    final user =
+        await pb.collection('users').authWithOAuth2(providerName, (url) async {
+      await launchUrl(url, webOnlyWindowName: "_blank");
+    });
+    if (user.token.isNotEmpty && user.record != null) {
       Get.offAllNamed('/dashboard');
-    } catch (e) {
-      isUserAuthenticated.value = false;
-      print(e);
     }
   }
 
   Future<void> logout() async {
-    await _secureStorageService.deleteToken();
-    isUserAuthenticated.value = false;
+    await _clearUserInfo();
+    Get.offAllNamed('/login');
+  }
+
+  Future<void> _clearUserInfo() async {
     pb.authStore.clear();
   }
 }

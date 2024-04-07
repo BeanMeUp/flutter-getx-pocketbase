@@ -2,26 +2,35 @@
 
 A quick example on how to do Google Authentication for iOS, Android, and Web with Pocketbase in Flutter using GetX.
 
-## Getting Started
+## Getting Started / Configuration
 
-Copy `.env.example` to `.env` and add your PocketBase URL to it
-`POCKETBASE_URI=http://127.0.0.1:8090`
+Open `lib/core/services/pocketbase/pocketbase.dart` and add your PocketBase URL to it,
+by replacung `http://127.0.0.1:8090`
 
 ## How It Works
 
 This example uses getx to handle middleware, routing, and controllers for the authentication.
 It also uses flutter_secure_storage to store the authentication token for session handling.
 
+## lib/core/services/pocketbase/pocketbase.dart
+
+This is a singleton that controls your AuthStore token to persist your session data.
+This is needed so that both web and mobile works correctly.
+
+We are using `flutter_secure_storage` here so that way the data is encrypted.
+
 ### main.dart
 
 In `main.dart` you can see:
 
 ```dart
-await dotenv.load(fileName: ".env"); // Load environment variables
+await PocketBaseSingleton().initialize();
 Get.put(AuthController()); // Initialize the AuthController
 ```
 
-This loads your `.env` variables and the `AuthController()`
+This initializes the PocketBase Singleton and the `AuthController()`
+
+You now can use PocketBase, and keep its session using `final PocketBase pb = PocketBaseSingleton().client;`
 
 There is also:
 
@@ -41,22 +50,9 @@ In the routing you can add `RouteGuard()` into the middleware of the routes that
 
 ### core/middleware/route_guard.dart
 
-The route guard checks to see if you have a session, if you do not you are redirected to the login page
+The route guard checks to see if you have a session by checking `pb.authStore.isValid`, if you do not you are redirected to the login page
 
 ### core/controllers/auth_controller.dart
-
-`restoreSession()` checks to see if you have a token that is set by the `login()` or `loginProvider()`
-
-```dart
-void restoreSession() async {
-    String? token = await _secureStorageService.getToken();
-    if (token != null && token.isNotEmpty) {
-      isUserAuthenticated.value = true;
-    } else {
-      isUserAuthenticated.value = false;
-    }
-  }
-```
 
 `loginProvider()` uses PocketBase's `authWithOAuth2()` to login with any provider you setup in your PocketBase admin. With Google specificly, since it uses deep linking, you only need to setup a web client ID. No need for multiple Client IDs for Android and iOS.
 
@@ -66,17 +62,12 @@ If the login was successful then it saves a token that is read by the session ab
 
 ```dart
   Future<void> loginProvider(String providerName) async {
-    try {
-      final authData = await pb.collection('users').authWithOAuth2(providerName,
-          (url) async {
-        await launchUrl(url, webOnlyWindowName: '_blank');
-      });
-      await _secureStorageService.saveToken(authData.token);
-      isUserAuthenticated.value = true;
+    final user =
+        await pb.collection('users').authWithOAuth2(providerName, (url) async {
+      await launchUrl(url, webOnlyWindowName: "_blank");
+    });
+    if (user.token.isNotEmpty && user.record != null) {
       Get.offAllNamed('/dashboard');
-    } catch (e) {
-      isUserAuthenticated.value = false;
-      print(e);
     }
   }
 ```

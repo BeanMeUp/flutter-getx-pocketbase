@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../controllers/auth_controller.dart';
+import 'package:pocketbase/pocketbase.dart';
+import '../services/local_storage.dart';
+import '../services/pocketbase/pocketbase.dart';
 
 class RouteGuard extends GetMiddleware {
+  final PocketBase pb = PocketBaseSingleton().client;
+  final LocalStorage storage = LocalStorage();
+
   @override
   RouteSettings? redirect(String? route) {
-    final AuthController authController = Get.find<AuthController>();
     // User is not authenticated, redirect to login page
-    if (!authController.isUserAuthenticated.value && route != '/login') {
-      return const RouteSettings(name: '/login');
+    if (!pb.authStore.isValid) {
+      Get.offAllNamed('/login');
     }
-    // User is authenticated and has a profile, continue as is
+
     return null;
   }
 }
